@@ -1,0 +1,50 @@
+modules = ["nodejs-20", "python-3.12", "bash"]
+
+[nix]
+channel = "stable-25_05"
+
+[agent]
+expertMode = true
+integrations = ["javascript_database:1.0.0", "github:1.0.0"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+NEXT_PUBLIC_SITE_URL = "https://www.tuckertrips.com"
+NEXT_PUBLIC_SUPABASE_URL = "https://rogrzxjxtypzsempesrf.supabase.co"
+NEXT_PUBLIC_SENTRY_DSN = "https://c3c360f69284a7344634316d90d79c1a@o4511125171077120.ingest.us.sentry.io/4511125183987712"
+SENTRY_ORG = "tuckertrips"
+SENTRY_PROJECT = "tucker-trips"
+SENTRY_DSN = "https://c3c360f69284a7344634316d90d79c1a@o4511125171077120.ingest.us.sentry.io/4511125183987712"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 120000

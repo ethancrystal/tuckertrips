@@ -1,0 +1,34 @@
+In Next.js, an 18-second "dead zone" between the initial request (http.server) and the first internal spans (resolve page components) usually points to logic that runs before the rendering engine takes over.
+Based on common performance pitfalls, here are the three most likely culprits for that 18-second delay:
+1. Blocking Middleware Logic
+Next.js Middleware runs for every request before any routing or rendering happens. If your middleware.ts performs synchronous blocking operations or slow external calls, it will delay the entire waterfall. [1] 
+
+* External Auth/API Calls: Middleware is often used for session validation. If your auth service or an external feature flag provider is slow, it hangs the request before the page even begins to "resolve".
+* Heavy Data Processing: Performing complex crypto operations or large JSON parsing inside the middleware can peg the CPU, delaying the handoff to the server components. [2, 3] 
+
+2. Slow "Instrumentation" Hook
+If you are using the instrumentation.ts file (which is common for setting up OpenTelemetry or Sentry), this code runs once at startup but can also introduce overhead during the initial request lifecycle if it's performing heavy side effects. In a development environment (as seen in your trace), this might also be related to the time Next.js takes to lazily compile the middleware or instrumentation code itself on the first hit. [4, 5] 
+3. Cold Boot / Development Compilation
+Since your environment is set to development, a massive initial delay is frequently caused by on-demand compilation.
+
+* If this was the first request after a code change, Next.js may have spent those 18 seconds compiling the route, its dependencies, and any heavy libraries (like lucide-react or large UI kits) before it could even "resolve" the components. [4, 6] 
+
+------------------------------
+How to identify the exact cause:
+To narrow this down, you can add simple "poor man's tracing" to your middleware:
+
+// middleware.tsexport function middleware(request: NextRequest) {
+  console.time('MIDDLEWARE_EXECUTION');
+  // ... your logic ...
+  console.timeEnd('MIDDLEWARE_EXECUTION');
+  return NextResponse.next();
+}
+
+Next Step: Check your terminal logs. Do you see a "Compiled / in ..." message that matches the 18-second window, or is there a specific middleware console log that appears much later than the request start?
+
+[1] [https://stackoverflow.com](https://stackoverflow.com/questions/76164152/why-is-next-js-middleware-running-multiple-times)
+[2] [https://stackoverflow.com](https://stackoverflow.com/questions/79601328/next-js-middleware-causes-delay-in-navigation)
+[3] [https://medium.com](https://medium.com/@shivashanker7337/the-next-js-middleware-dilemma-why-our-simple-solution-is-getting-complicated-c7c5358a76f8)
+[4] [https://oneuptime.com](https://oneuptime.com/blog/post/2026-02-06-trace-nextjs-server-components-api-routes-opentelemetry/view)
+[5] [https://oneuptime.com](https://oneuptime.com/blog/post/2026-02-06-opentelemetry-nextjs-instrumentation-hook/view)
+[6] [https://github.com](https://github.com/vercel/next.js/discussions/51974)

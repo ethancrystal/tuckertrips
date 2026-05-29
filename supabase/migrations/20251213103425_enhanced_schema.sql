@@ -1,0 +1,2 @@
+-- Enhanced schema - already applied, this is a placeholder for migration tracking
+-- All tables, columns, and policies from this migration are already in the database

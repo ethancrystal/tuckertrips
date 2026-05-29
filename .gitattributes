@@ -1,0 +1,25 @@
+# Normalize text file line endings across platforms
+# Force LF in the repository regardless of local core.autocrlf settings.
+* text=auto eol=lf
+
+# Treat common binaries as binary (no end-of-line normalization)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.tar binary
+*.7z binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.mp4 binary
+*.mov binary
+*.mp3 binary
+*.wav binary

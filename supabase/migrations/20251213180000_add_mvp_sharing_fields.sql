@@ -1,0 +1,2 @@
+-- MVP sharing fields - already applied, this is a placeholder for migration tracking
+-- is_shared and shared_at columns are already added to the trips table
