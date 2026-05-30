@@ -26,6 +26,7 @@ export async function GET(request) {
       .select('id, full_name, avatar_url, is_online, last_seen')
       .or(`is_online.eq.true,last_seen.gte.${fiveMinutesAgo}`)
       .neq('id', user.id)
+      .order('last_seen', { ascending: false })
       .limit(100)
 
     if (error) throw error
