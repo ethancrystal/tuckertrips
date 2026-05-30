@@ -65,9 +65,10 @@ export async function POST(request) {
     // Check if already friends or request exists
     const { data: existing } = await supabase
       .from('friendships')
-      .select('*')
+      .select('id')
       .or(`and(user_id.eq.${user.id},friend_id.eq.${validatedData.friendId}),and(user_id.eq.${validatedData.friendId},friend_id.eq.${user.id})`)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(

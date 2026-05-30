@@ -80,7 +80,7 @@ export default function SharedTripPage() {
     setShowAuth(false)
     const { data: { user } } = await supabase.auth.getUser()
     setUser(user)
-    if (user) router.push('/dashboard')
+    if (user) router.push('/')
   }
 
   const renderRating = (rating) => (
@@ -165,7 +165,7 @@ export default function SharedTripPage() {
 
               {user ? (
                 <Button
-                  onClick={() => router.push('/dashboard')}
+                  onClick={() => router.push('/')}
                   className="bg-gradient-to-r from-[#ff34ac] to-[#7dbbe5]"
                 >
                   View in Dashboard
@@ -300,7 +300,7 @@ export default function SharedTripPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               {user ? (
                 <Button
-                  onClick={() => router.push('/dashboard')}
+                  onClick={() => router.push('/')}
                   className="bg-gradient-to-r from-[#ff34ac] to-[#7dbbe5]"
                 >
                   Go to Dashboard

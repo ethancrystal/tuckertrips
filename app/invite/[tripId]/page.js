@@ -25,18 +25,23 @@ export default function InvitePage() {
   const [inviteProcessed, setInviteProcessed] = useState(false)
 
   useEffect(() => {
-    // Check if user is already authenticated
+    // Check if user is already authenticated (don't process yet — wait for trip)
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-
-      if (user) {
-        // If user is already logged in, process the invitation
-        processInvitation(user)
-      }
     }
     checkUser()
   }, [])
+
+  // Process the invitation only once BOTH the user and the trip are loaded, so
+  // the trip_shares row gets a valid shared_by (trip.user_id) instead of racing
+  // the trip fetch and inserting shared_by: undefined.
+  useEffect(() => {
+    if (user && trip && !inviteProcessed) {
+      processInvitation(user)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, trip, inviteProcessed])
 
   useEffect(() => {
     const fetchInvitedTrip = async () => {
@@ -135,8 +140,9 @@ export default function InvitePage() {
       }
 
       // Redirect to dashboard with success message
+      // (the dashboard renders at '/', there is no '/dashboard' route)
       setTimeout(() => {
-        router.push('/dashboard')
+        router.push('/')
       }, 1000)
 
     } catch (err) {
@@ -146,17 +152,14 @@ export default function InvitePage() {
 
   const handleAuthSuccess = async (authUser) => {
     setShowAuth(false)
-    // Process the invitation immediately after the user logs in or signs up
+    // Just set the user; the effect above processes the invitation once both
+    // the user and the trip are loaded (avoids a shared_by race / double-insert).
     if (authUser) {
       setUser(authUser)
-      await processInvitation(authUser)
     } else {
       // Fallback: re-check auth state
       const { data: { user: currentUser } } = await supabase.auth.getUser()
-      if (currentUser) {
-        setUser(currentUser)
-        await processInvitation(currentUser)
-      }
+      if (currentUser) setUser(currentUser)
     }
   }
 
@@ -178,7 +181,7 @@ export default function InvitePage() {
       rental: '🚗',
       default: '📍'
     }
-    return icons[categoryName.toLowerCase()] || icons.default
+    return icons[categoryName?.toLowerCase()] || icons.default
   }
 
   const renderRating = (rating) => {

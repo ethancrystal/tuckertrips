@@ -25,6 +25,8 @@ export async function GET(request) {
       .from('profiles')
       .select('id, full_name, avatar_url, is_online, last_seen')
       .or(`is_online.eq.true,last_seen.gte.${fiveMinutesAgo}`)
+      .neq('id', user.id)
+      .limit(100)
 
     if (error) throw error
 

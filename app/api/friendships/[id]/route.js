@@ -46,65 +46,27 @@ export async function PATCH(
       )
     }
 
-    // For 'accepted' status, also create a reciprocal friendship
-    if (validatedData.status === 'accepted') {
-      const { error: updateError } = await supabase
-        .from('friendships')
-        .update({ status: 'accepted' })
-        .eq('id', friendshipId)
-
-      if (updateError) throw updateError
-
-      // Create reciprocal friendship
-      const { error: reciprocalError } = await supabase
-        .from('friendships')
-        .insert({
-          user_id: friendship.friend_id,
-          friend_id: friendship.user_id,
-          status: 'accepted',
-        })
-
-      if (reciprocalError) {
-        // If reciprocal fails, attempt rollback of the first update
-        const { error: rollbackError } = await supabase
-          .from('friendships')
-          .update({ status: 'pending' })
-          .eq('id', friendshipId)
-
-        if (rollbackError) {
-          console.error(
-            'CRITICAL: Friendship accept partial failure — reciprocal insert failed AND rollback failed.',
-            { friendshipId, reciprocalError, rollbackError }
-          )
-          return NextResponse.json(
-            { error: 'Friendship accept failed and state may be inconsistent. Please contact support.' },
-            { status: 500 }
-          )
-        }
-
-        return NextResponse.json(
-          { error: 'Failed to accept friendship — the operation was rolled back. Please try again.' },
-          { status: 500 }
-        )
-      }
-
-      return NextResponse.json({
-        friendship: { ...friendship, status: 'accepted' },
-        message: 'Friend request accepted'
-      })
-    }
-
-    // For rejected/blocked, just update the status
+    // Single-row, bidirectional friendship model: the GET query matches on
+    // either user_id or friend_id, so a single accepted row is sufficient.
+    // No reciprocal row is created — that previously caused duplicate listings
+    // and UNIQUE(user_id, friend_id) accept failures when a reverse-direction
+    // request already existed.
     const { data: updated, error: updateError } = await supabase
       .from('friendships')
       .update({ status: validatedData.status })
       .eq('id', friendshipId)
-      .select('*, friend:profiles(*)')
+      .select('*, friend:profiles!friendships_friend_id_fkey(*)')
       .single()
 
     if (updateError) throw updateError
 
-    return NextResponse.json({ friendship: updated })
+    return NextResponse.json({
+      friendship: updated,
+      message:
+        validatedData.status === 'accepted'
+          ? 'Friend request accepted'
+          : `Friend request ${validatedData.status}`,
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -155,17 +117,21 @@ export async function DELETE(
       )
     }
 
-    // Delete the friendship and its reciprocal if accepted
-    await supabase.from('friendships').delete().eq('id', friendshipId)
+    // Delete BOTH directions of this friendship pair. The single-row model uses
+    // one row going forward, but legacy data created by the old accept path may
+    // still contain a reciprocal (friend_id, user_id) row; leaving it behind
+    // would keep friends-visibility trip access alive after "removed". Deleting
+    // the unordered pair normalizes that and is idempotent. RLS permits a
+    // participant to delete rows where they are either user_id or friend_id.
+    const { error: deleteError } = await supabase
+      .from('friendships')
+      .delete()
+      .or(
+        `and(user_id.eq.${friendship.user_id},friend_id.eq.${friendship.friend_id}),` +
+          `and(user_id.eq.${friendship.friend_id},friend_id.eq.${friendship.user_id})`
+      )
 
-    if (friendship.status === 'accepted') {
-      // Also delete the reciprocal friendship
-      await supabase
-        .from('friendships')
-        .delete()
-        .eq('user_id', friendship.friend_id)
-        .eq('friend_id', friendship.user_id)
-    }
+    if (deleteError) throw deleteError
 
     return NextResponse.json({ message: 'Friendship removed' })
   } catch (error) {

@@ -62,7 +62,6 @@ const tripUpdateSchema = z
     airlines: z.array(airlineSchema).optional(),
     accommodations: z.array(accommodationSchema).optional(),
     segments: z.array(segmentSchema).optional(),
-    trip_images: z.array(z.string()).optional(),
     photo_urls: z.array(z.string().url()).optional(),
     /** @deprecated Use trip_shares table instead */
     shared_with: z.array(z.string().uuid()).optional(),
@@ -96,6 +95,14 @@ const mapTripUpdate = (updates) => {
   if ('end_date' in updates) payload.end_date = updates.end_date || null
   if ('cover_image' in updates) payload.cover_image = updates.cover_image || null
   if ('overall_rating' in updates) payload.overall_rating = updates.overall_rating || null
+  // Rich fields (real columns). trip_images intentionally excluded — no such column.
+  if ('description' in updates) payload.description = updates.description
+  if ('weather' in updates) payload.weather = updates.weather
+  if ('overall_comment' in updates) payload.overall_comment = updates.overall_comment
+  if ('airlines' in updates) payload.airlines = updates.airlines
+  if ('accommodations' in updates) payload.accommodations = updates.accommodations
+  if ('segments' in updates) payload.segments = updates.segments
+  if ('photo_urls' in updates) payload.photo_urls = updates.photo_urls
 
   payload.updated_at = new Date().toISOString()
   return payload
@@ -142,7 +149,7 @@ export const PATCH = withAuth(async (request, { params }) => {
 
     const { data: updatedTrip, error } = await supabase
       .from('trips')
-      .update({ ...mapTripUpdate(parsed.data), updated_at: new Date().toISOString() })
+      .update(mapTripUpdate(parsed.data))
       .eq('id', params.id)
       .select()
       .single()
