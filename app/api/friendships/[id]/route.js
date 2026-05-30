@@ -117,12 +117,19 @@ export async function DELETE(
       )
     }
 
-    // Single-row model: one delete removes the friendship for both parties
-    // (no reciprocal row exists to orphan).
+    // Delete BOTH directions of this friendship pair. The single-row model uses
+    // one row going forward, but legacy data created by the old accept path may
+    // still contain a reciprocal (friend_id, user_id) row; leaving it behind
+    // would keep friends-visibility trip access alive after "removed". Deleting
+    // the unordered pair normalizes that and is idempotent. RLS permits a
+    // participant to delete rows where they are either user_id or friend_id.
     const { error: deleteError } = await supabase
       .from('friendships')
       .delete()
-      .eq('id', friendshipId)
+      .or(
+        `and(user_id.eq.${friendship.user_id},friend_id.eq.${friendship.friend_id}),` +
+          `and(user_id.eq.${friendship.friend_id},friend_id.eq.${friendship.user_id})`
+      )
 
     if (deleteError) throw deleteError
 
