@@ -12,7 +12,7 @@ Tucker Trips is a Next.js 14 travel planning and sharing app deployed on Vercel.
 | UI | shadcn/ui (Radix primitives) + Tailwind CSS |
 | Database / Auth | Supabase (PostgreSQL, RLS, Storage, Realtime) |
 | Email | Resend (transactional emails) |
-| Package manager | **npm** — the active package manager; `package-lock.json` is the lock file |
+| Package manager | **pnpm** — the active package manager (pinned via `packageManager` + Corepack); `pnpm-lock.yaml` is the lock file |
 | Deployment | Vercel |
 
 ---
@@ -433,7 +433,7 @@ RLS: public INSERT allowed, authenticated SELECT.
 
 1. **Vercel `--prebuilt` is required.** Direct `vercel --prod` fails because Replit's git commit author (`51141499-moizjmj@users.noreply.replit.com`) is not a Vercel team member. Always use the two-step build + deploy approach described in the Deployment section below.
 
-2. **npm is the active package manager.** Both `package-lock.json` (npm) and `pnpm-lock.yaml` (historical) exist in the repo. Use `npm install` for dependency management — do not use `pnpm` or `yarn`, as the Replit workflow runs `npm run dev` and the lock file npm tracks is `package-lock.json`.
+2. **pnpm is the active package manager.** `pnpm-lock.yaml` is the canonical lock file, and the project pins pnpm via the `packageManager` field (run `corepack enable` to activate it). Use `pnpm install` for dependency management — do not use `npm` or `yarn` (`package-lock.json` is gitignored to prevent a second lock file from drifting). Build-script approvals live in `pnpm-workspace.yaml` under `allowBuilds` — pnpm v11 **removed** `onlyBuiltDependencies` / `ignoredBuiltDependencies` in favor of this `package -> boolean` map, and a build script left undecided fails `pnpm install` because `strictDepBuilds` defaults to true.
 
 3. **SWC vs Babel scope.** `jest.babel.config.js` is scoped to Jest only (via the `env.test` pattern). Next.js uses SWC for compilation. Do not add a root-level `.babelrc` or `babel.config.js` — it would disable SWC globally.
 
@@ -467,10 +467,10 @@ RLS: public INSERT allowed, authenticated SELECT.
 
 ## Testing
 
-- **Unit tests:** `npm test` — Jest + jsdom, tests in `__tests__/` mirroring `components/` and `lib/`
-- **Single file:** `npm test -- __tests__/components/TripCard.test.jsx`
-- **Watch mode:** `npm run test:watch`
-- **Coverage:** `npm run test:coverage`
+- **Unit tests:** `pnpm test` — Jest + jsdom, tests in `__tests__/` mirroring `components/` and `lib/`
+- **Single file:** `pnpm test -- __tests__/components/TripCard.test.jsx`
+- **Watch mode:** `pnpm test:watch`
+- **Coverage:** `pnpm test:coverage`
 - **Python smoke test:** `python backend_test.py` (integration smoke test)
 
 Babel config for Jest lives in `jest.babel.config.js` and is activated only in the `test` Node env. It does not affect the Next.js build.
@@ -520,21 +520,22 @@ In Supabase Dashboard -> Authentication -> URL Configuration:
 ## Development Commands
 
 ```bash
-npm run dev              # Dev server on port 5000 (hot reload)
-npm run dev:no-reload    # Dev server without hot reload (quieter)
-npm run build            # Production build
-npm run start            # Start production server
-npm run lint             # ESLint (next lint)
-npm test                 # Jest (all tests)
-npm run test:watch       # Jest watch mode
-npm run test:coverage    # Jest coverage report
+pnpm dev                 # Dev server on port 5000 (hot reload)
+pnpm dev:no-reload       # Dev server without hot reload (quieter)
+pnpm build               # Production build
+pnpm start               # Start production server
+pnpm lint                # ESLint (next lint)
+pnpm test                # Jest (all tests)
+pnpm test:watch          # Jest watch mode
+pnpm test:coverage       # Jest coverage report
 ```
 
 Local setup:
 ```bash
 cp .env.example .env.local   # fill in real values
-npm install
-npm run dev
+corepack enable              # first run only: activate the pinned pnpm
+pnpm install
+pnpm dev
 ```
 
 ---
@@ -544,4 +545,4 @@ npm run dev
 - Reuse existing patterns and components — avoid rewrites
 - Keep client/server boundary clear (especially around Supabase keys)
 - Never commit secrets; use `.env.local` (gitignored) or platform secrets
-- Use npm — do not use pnpm or yarn
+- Use pnpm — do not use npm or yarn
