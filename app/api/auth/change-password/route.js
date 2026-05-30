@@ -1,6 +1,7 @@
 // Change Password API - For authenticated users to change their password
 import { NextResponse } from 'next/server'
 import { createSupabaseRouteClient } from '@/lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
@@ -41,7 +42,26 @@ export async function POST(request) {
       )
     }
 
-    const { newPassword } = validationResult.data
+    const { currentPassword, newPassword } = validationResult.data
+
+    // Re-authenticate: verify the current password before allowing a change.
+    // Uses a throwaway client (no session persistence) so the active session
+    // cookies are not disturbed by this verification sign-in.
+    const verifyClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    )
+    const { error: reauthError } = await verifyClient.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    })
+    if (reauthError) {
+      return NextResponse.json(
+        { error: 'Current password is incorrect' },
+        { status: 401 }
+      )
+    }
 
     // Update password for the currently authenticated user
     const { error: updateError } = await supabase.auth.updateUser({

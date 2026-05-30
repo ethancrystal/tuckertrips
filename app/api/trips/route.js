@@ -54,7 +54,6 @@ const tripSchema = z.object({
   airlines: z.array(airlineSchema).optional(),
   accommodations: z.array(accommodationSchema).optional(),
   segments: z.array(segmentSchema).optional(),
-  trip_images: z.array(z.string()).optional(),
   photo_urls: z.array(z.string().url()).optional()
 }).refine((data) => {
   // Validate that end_date is after start_date if both are provided
@@ -86,17 +85,29 @@ const normalizeStringArray = (value) => {
   return [String(value)]
 }
 
-const mapTripInsert = (data, userId) => ({
-  user_id: userId,
-  trip_name: data.trip_name.trim(),
-  destination: data.destination.trim(),
-  trip_type: data.trip_type || 'future',
-  visibility: data.visibility || 'private',
-  start_date: data.start_date || null,
-  end_date: data.end_date || null,
-  cover_image: data.cover_image || null,
-  overall_rating: data.overall_rating || null,
-})
+const mapTripInsert = (data, userId) => {
+  const row = {
+    user_id: userId,
+    trip_name: data.trip_name.trim(),
+    destination: data.destination.trim(),
+    trip_type: data.trip_type || 'future',
+    visibility: data.visibility || 'private',
+    start_date: data.start_date || null,
+    end_date: data.end_date || null,
+    cover_image: data.cover_image || null,
+    overall_rating: data.overall_rating || null,
+  }
+  // Persist the rich, validated fields (real columns confirmed in the trips table).
+  // NOTE: trip_images is intentionally NOT mapped — there is no such column.
+  if (data.description !== undefined) row.description = data.description
+  if (data.weather !== undefined) row.weather = data.weather
+  if (data.overall_comment !== undefined) row.overall_comment = data.overall_comment
+  if (data.airlines !== undefined) row.airlines = data.airlines
+  if (data.accommodations !== undefined) row.accommodations = data.accommodations
+  if (data.segments !== undefined) row.segments = data.segments
+  if (data.photo_urls !== undefined) row.photo_urls = data.photo_urls
+  return row
+}
 
 const mapTripResponse = (trip) => {
   if (!trip) return trip

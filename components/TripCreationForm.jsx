@@ -136,6 +136,14 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
         setFormData(editFormData)
         setTripType(initialData.trip_type || initialData.status || 'future')
         setStep(0)
+        // Seed the dedicated photo state too — the Photos step renders from
+        // these, so without this existing photos disappear on edit and adding
+        // a new one would overwrite (not append to) the existing gallery.
+        setCoverPhoto(editFormData.cover_photo_url || null)
+        setGalleryPhotos(editFormData.gallery_photo_urls || [])
+        // Return so we don't fall through into the draft-restore prompt below,
+        // which would otherwise clobber the trip currently being edited.
+        return
       }
       // If we have copied trip data, populate the form with it
       else if (copiedTrip) {
@@ -209,6 +217,8 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
         setFormData(copiedFormData)
         setTripType('future') // Default to future for copied trips
         setStep(0) // Start at the first step
+        setCoverPhoto(null)
+        setGalleryPhotos([])
         toast.success('Trip copied! You can edit the details below.')
         return
       }
@@ -231,7 +241,7 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
         }
       }
     }
-  }, [open, copiedTrip])
+  }, [open, copiedTrip, mode, initialData?.id])
 
   // Save draft to localStorage whenever data changes
   useEffect(() => {
