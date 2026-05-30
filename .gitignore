@@ -12,6 +12,9 @@ main-main--final/
 node_modules/
 /node_modules
 **/node_modules/
+
+# Enforce pnpm — do not track the npm lock file (use pnpm-lock.yaml)
+package-lock.json
 /.pnp
 .pnp.js
 .pnpm-store/

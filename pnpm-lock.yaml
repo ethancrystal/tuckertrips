@@ -152,9 +152,6 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
-      pnpm:
-        specifier: ^10.32.1
-        version: 10.32.1
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -4558,11 +4555,6 @@ packages:
   pkg-dir@4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
     engines: {node: '>=8'}
-
-  pnpm@10.32.1:
-    resolution: {integrity: sha512-pwaTjw6JrBRWtlY+q07fHR+vM2jRGR/FxZeQ6W3JGORFarLmfWE94QQ9LoyB+HMD5rQNT/7KnfFe8a1Wc0jyvg==}
-    engines: {node: '>=18.12'}
-    hasBin: true
 
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
@@ -10438,8 +10430,6 @@ snapshots:
     dependencies:
       find-up: 4.1.0
 
-  pnpm@10.32.1: {}
-
   possible-typed-array-names@1.1.0: {}
 
   postal-mime@2.7.3: {}
@@ -11083,7 +11073,7 @@ snapshots:
   terser@5.48.0:
     dependencies:
       '@jridgewell/source-map': 0.3.11
-      acorn: 8.15.0
+      acorn: 8.16.0
       commander: 2.20.3
       source-map-support: 0.5.21
 
