@@ -1,12 +1,10 @@
 packages:
   - "."
 
+# Build-script approvals.
+# pnpm v11 removed onlyBuiltDependencies / ignoredBuiltDependencies /
+# neverBuiltDependencies in favor of this allowBuilds map (package -> boolean).
+# https://pnpm.io/settings#allowbuilds
 allowBuilds:
-  '@sentry/cli': set this to true or false
-  unrs-resolver: set this to true or false
-
-ignoredBuiltDependencies:
-  - unrs-resolver
-
-onlyBuiltDependencies:
-  - supabase
+  "@sentry/cli": true # downloads the Sentry release CLI binary on install
+  unrs-resolver: false # ships prebuilt native bindings; building is unnecessary
