@@ -12,7 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "secret:scan": "node scripts/secret-scan.js"
+    "secret:scan": "node scripts/secret-scan.js",
+    "backup": "node scripts/backup-supabase.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
