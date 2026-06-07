@@ -25,6 +25,9 @@ package-lock.json
 !.yarn/releases
 !.yarn/versions
 
+# Database backups (contain real user PII — keep out of git history)
+/backups/
+
 # Testing
 /coverage
 

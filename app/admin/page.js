@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   // Overview Stats
   const [stats, setStats] = useState({
     totalUsers: 0,
+    totalTrips: 0,
     signupClicks: 0,
     recentClicks: 0,
     conversionRate: 0
@@ -37,6 +38,7 @@ export default function AdminDashboard() {
       const data = await response.json()
       setStats({
         totalUsers: data.totalUsers || 0,
+        totalTrips: data.totalTrips || 0,
         signupClicks: data.signupClicks || 0,
         recentClicks: data.recentClicks || 0,
         conversionRate: data.conversionRate || 0
@@ -167,11 +169,16 @@ export default function AdminDashboard() {
       <main className="pt-24 pb-12 px-6 max-w-7xl mx-auto">
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                 <Users className="w-8 h-8 text-purple-400 mb-4" />
                 <p className="text-3xl font-bold">{stats.totalUsers}</p>
                 <p className="text-gray-500 text-sm">Total Registered Users</p>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <Map className="w-8 h-8 text-emerald-400 mb-4" />
+                <p className="text-3xl font-bold">{stats.totalTrips}</p>
+                <p className="text-gray-500 text-sm">Total Trips</p>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                 <MousePointerClick className="w-8 h-8 text-pink-400 mb-4" />

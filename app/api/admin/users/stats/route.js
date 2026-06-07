@@ -63,6 +63,15 @@ export async function GET(request) {
       console.error('Error counting new users:', newUsersError)
     }
 
+    // Get total trips count (live — reflects every new trip immediately)
+    const { count: totalTrips, error: tripsError } = await supabase
+      .from('trips')
+      .select('*', { count: 'exact', head: true })
+
+    if (tripsError) {
+      console.error('Error counting trips:', tripsError)
+    }
+
     const { recentClicksSince, visibleThrough, delayHours } = getDelayedSignupAnalyticsWindow()
 
     // Get total Sign-Up button clicks, delayed by one hour for admin reporting
@@ -93,6 +102,7 @@ export async function GET(request) {
 
     return NextResponse.json({
       totalUsers: totalUsers || 0,
+      totalTrips: totalTrips || 0,
       onlineUsers: onlineUsers || 0,
       newUsers: newUsers || 0,
       signupClicks: signupClicks || 0,
