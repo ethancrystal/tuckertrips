@@ -1,124 +1,154 @@
 /**
- * TEMPORARY MAINTENANCE MIDDLEWARE
- * --------------------------------
- * For every incoming request, this returns a single self-contained HTTP 500
- * "database connection failed" error page. The real application is untouched —
- * to restore it, replace this file with the contents of
- * `middleware.original.bak.js`.
+ * Unified Next.js Edge Middleware
  *
- * The page is fully inline (no DB, no layout, no external assets), so it
- * renders even while the backend is unavailable. A per-request id + timestamp
- * are injected so it reads like a freshly generated server error.
+ * Handles two distinct protection concerns in a single, authoritative file:
+ *   1. Admin route protection  — custom HMAC-signed cookie session
+ *   2. User route protection   — Supabase Auth session via @supabase/ssr
+ *
+ * This replaces the previous split between middleware.js (admin HMAC) and
+ * lib/admin-auth-middleware.js (duplicate HMAC logic), consolidating all
+ * edge-level authorization into one place.
  */
 
 import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
-const MAINTENANCE_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="robots" content="noindex" />
-<title>500 — Database Error</title>
-<style>
-  html, body { height: 100%; margin: 0; }
-  body {
-    background: #f6f6f6;
-    color: #1a1a1a;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    box-sizing: border-box;
-  }
-  .card {
-    width: 100%;
-    max-width: 640px;
-    background: #ffffff;
-    border: 1px solid #e3e3e3;
-    border-radius: 8px;
-    padding: 32px 36px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-  .code {
-    color: #b00020;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin: 0 0 8px;
-  }
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0 0 12px;
-  }
-  p {
-    color: #555;
-    line-height: 1.55;
-    margin: 0 0 20px;
-    font-size: 0.95rem;
-  }
-  .trace {
-    background: #1e1e1e;
-    color: #d4d4d4;
-    border-radius: 6px;
-    padding: 16px 18px;
-    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-    font-size: 0.82rem;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    word-break: break-word;
-    overflow-x: auto;
-  }
-  .trace .err { color: #f48771; }
-  .trace .dim { color: #808080; }
-  .meta {
-    margin-top: 20px;
-    color: #999;
-    font-size: 0.78rem;
-    font-family: "SF Mono", Menlo, Consolas, monospace;
-  }
-</style>
-</head>
-<body>
-  <div class="card">
-    <p class="code">HTTP 500 · Internal Server Error</p>
-    <h1>Database connection failed</h1>
-    <p>The application could not establish a connection to its database. This is a temporary problem on our end — please try again in a little while.</p>
-    <div class="trace"><span class="err">Error: connection to database failed</span>
-  <span class="dim">at</span> Pool.connect (pg-pool)
-  <span class="dim">at</span> async query (lib/db)
-<span class="err">SequelizeConnectionError: could not connect to server: Connection refused</span>
-  <span class="dim">Is the server running on that host and accepting TCP/IP connections?</span></div>
-    <p class="meta">Request ID: __REQUEST_ID__ · __TIMESTAMP__</p>
-  </div>
-</body>
-</html>`
+// ---------------------------------------------------------------------------
+// Admin session helpers (Edge-compatible — no Node.js crypto)
+// ---------------------------------------------------------------------------
 
-export function middleware(request) {
-  // Build a per-request error fingerprint so the page reads like a real,
-  // freshly generated 500 rather than a static sign.
-  const requestId =
-    (request && request.headers && request.headers.get('x-vercel-id')) ||
-    Math.random().toString(16).slice(2, 10) + '-' + Math.random().toString(16).slice(2, 6)
-  const html = MAINTENANCE_HTML
-    .replace('__REQUEST_ID__', requestId)
-    .replace('__TIMESTAMP__', new Date().toUTCString())
+const ADMIN_SESSION_COOKIE = 'admin_session'
 
-  return new NextResponse(html, {
-    status: 500,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'no-store, max-age=0',
-    },
-  })
+/**
+ * Verifies the admin HMAC-signed session token using the Web Crypto API,
+ * which is available in the Next.js Edge Runtime.
+ */
+async function verifyAdminToken(token) {
+  try {
+    if (!token) return false
+
+    const sessionSecret = process.env.ADMIN_SESSION_SECRET || process.env.JWT_SECRET || ''
+    const configuredEmail = process.env.ADMIN_EMAIL || ''
+    if (!sessionSecret || !configuredEmail) return false
+
+    const dotIndex = token.lastIndexOf('.')
+    if (dotIndex === -1) return false
+
+    const payload = token.slice(0, dotIndex)
+    const signature = token.slice(dotIndex + 1)
+
+    const encoder = new TextEncoder()
+    const keyData = encoder.encode(sessionSecret)
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    )
+
+    const expectedSig = await crypto.subtle.sign(
+      'HMAC',
+      cryptoKey,
+      encoder.encode(payload)
+    )
+
+    const expectedBase64 = btoa(String.fromCharCode(...new Uint8Array(expectedSig)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+
+    if (signature !== expectedBase64) return false
+
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    if (!decoded?.email || !decoded?.expiresAt) return false
+    if (decoded.email !== configuredEmail) return false
+    if (Date.now() >= Number(decoded.expiresAt)) return false
+
+    return true
+  } catch {
+    return false
+  }
 }
 
-// Match every route. The static-asset exclusions below keep Next's internal
-// build assets from being intercepted; everything user-facing returns the
-// maintenance page.
+// ---------------------------------------------------------------------------
+// Main middleware
+// ---------------------------------------------------------------------------
+
+export async function middleware(request) {
+  const { pathname } = request.nextUrl
+
+  // ── 1. Admin Route Protection ─────────────────────────────────────────────
+  // Protect all /admin/* paths except the login page itself.
+  if (pathname.startsWith('/admin') && !pathname.startsWith('/admin-login')) {
+    const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value || null
+    const isValidAdmin = await verifyAdminToken(token)
+
+    if (!isValidAdmin) {
+      const loginUrl = new URL('/admin-login', request.url)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // Admin is authenticated — pass through
+    return NextResponse.next()
+  }
+
+  // ── 2. User Route Protection ──────────────────────────────────────────────
+  // Protect authenticated app routes. The Supabase SSR client refreshes the
+  // session cookie automatically on every request, keeping tokens fresh.
+  const protectedPaths = ['/dashboard', '/settings', '/profile']
+  const isProtectedPath = protectedPaths.some((p) => pathname.startsWith(p))
+
+  if (isProtectedPath) {
+    let response = NextResponse.next({
+      request: { headers: request.headers },
+    })
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          get(name) {
+            return request.cookies.get(name)?.value
+          },
+          set(name, value, options) {
+            // Propagate cookie updates to both the request and response
+            request.cookies.set({ name, value, ...options })
+            response = NextResponse.next({ request: { headers: request.headers } })
+            response.cookies.set({ name, value, ...options })
+          },
+          remove(name, options) {
+            request.cookies.set({ name, value: '', ...options })
+            response = NextResponse.next({ request: { headers: request.headers } })
+            response.cookies.set({ name, value: '', ...options })
+          },
+        },
+      }
+    )
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
+      const loginUrl = new URL('/login', request.url)
+      // Preserve the original destination so the login page can redirect back
+      loginUrl.searchParams.set('redirectTo', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    return response
+  }
+
+  return NextResponse.next()
+}
+
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/admin/:path*',
+    '/dashboard/:path*',
+    '/settings/:path*',
+    '/profile/:path*',
+  ],
 }
