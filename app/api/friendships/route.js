@@ -84,7 +84,7 @@ export async function POST(request) {
         friend_id: validatedData.friendId,
         status: 'pending',
       })
-      .select('*, friend:profiles(*)')
+      .select('*, friend:profiles!friendships_friend_id_fkey(*)')
       .single()
 
     if (error) throw error

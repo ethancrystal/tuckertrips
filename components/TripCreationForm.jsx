@@ -434,11 +434,13 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
           .update({
             trip_name: formData.trip_name,
             destination: formData.location,
+            description: formData.description || null,
             start_date: formData.start_date || null,
             end_date: formData.end_date || null,
             trip_type: tripType,
             visibility: visibility,
             cover_image: formData.cover_photo_url || null,
+            photo_urls: galleryPhotos,
             updated_at: new Date().toISOString(),
           })
           .eq('id', initialData.id)
@@ -455,11 +457,13 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
             user_id: user.id,
             trip_name: formData.trip_name,
             destination: formData.location,
+            description: formData.description || null,
             start_date: formData.start_date || null,
             end_date: formData.end_date || null,
             trip_type: tripType,
             visibility: visibility,
             cover_image: formData.cover_photo_url || null,
+            photo_urls: galleryPhotos,
           })
           .select()
           .single()
@@ -586,6 +590,8 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
       rental_car_excursion: '',
     })
     setTripType('taken')
+    setCoverPhoto(null)
+    setGalleryPhotos([])
     onClose()
   }
 

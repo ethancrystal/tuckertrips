@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -23,6 +23,7 @@ export default function InvitePage() {
   const [showAuth, setShowAuth] = useState(false)
   const [user, setUser] = useState(null)
   const [inviteProcessed, setInviteProcessed] = useState(false)
+  const processingRef = useRef(false)
 
   useEffect(() => {
     // Check if user is already authenticated (don't process yet — wait for trip)
@@ -100,7 +101,11 @@ export default function InvitePage() {
   }, [tripId])
 
   const processInvitation = async (authUser) => {
-    if (!tripId || inviteProcessed) return
+    // inviteProcessed is async state; processingRef guards against the effect
+    // firing twice (user and trip resolving in the same tick) before the state
+    // commit lands, which would otherwise double-insert the trip_shares row.
+    if (!tripId || inviteProcessed || processingRef.current) return
+    processingRef.current = true
 
     try {
       // Create trip_shares record if user is logged in
@@ -146,6 +151,7 @@ export default function InvitePage() {
       }, 1000)
 
     } catch (err) {
+      processingRef.current = false // allow a retry if processing failed
       console.error('Error processing invitation:', err)
     }
   }

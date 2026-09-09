@@ -55,13 +55,21 @@ export async function PATCH(
       .from('friendships')
       .update({ status: validatedData.status })
       .eq('id', friendshipId)
-      .select('*, friend:profiles!friendships_friend_id_fkey(*)')
+      .select(
+        '*, requester:profiles!friendships_user_id_fkey(*), addressee:profiles!friendships_friend_id_fkey(*)'
+      )
       .single()
 
     if (updateError) throw updateError
 
+    // Present `friend` as the OTHER participant relative to the caller. In the
+    // single-row model the recipient is friend_id, so a fixed friend_id join
+    // would return the caller as their own friend.
+    const { requester, addressee, ...friendshipRow } = updated
+    const friend = friendshipRow.user_id === user.id ? addressee : requester
+
     return NextResponse.json({
-      friendship: updated,
+      friendship: { ...friendshipRow, friend },
       message:
         validatedData.status === 'accepted'
           ? 'Friend request accepted'
@@ -123,17 +131,27 @@ export async function DELETE(
     // would keep friends-visibility trip access alive after "removed". Deleting
     // the unordered pair normalizes that and is idempotent. RLS permits a
     // participant to delete rows where they are either user_id or friend_id.
-    const { error: deleteError } = await supabase
+    const { data: deletedRows, error: deleteError } = await supabase
       .from('friendships')
       .delete()
       .or(
         `and(user_id.eq.${friendship.user_id},friend_id.eq.${friendship.friend_id}),` +
           `and(user_id.eq.${friendship.friend_id},friend_id.eq.${friendship.user_id})`
       )
+      .select('id')
 
     if (deleteError) throw deleteError
 
-    return NextResponse.json({ message: 'Friendship removed' })
+    // If RLS filtered every row out (caller not a participant) nothing is
+    // deleted and no error is raised — surface that rather than a false success.
+    if (!deletedRows || deletedRows.length === 0) {
+      return NextResponse.json(
+        { error: 'Friendship not found or you are not permitted to remove it' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ message: 'Friendship removed', removed: deletedRows.length })
   } catch (error) {
     console.error('Failed to delete friendship:', error)
     const response = { error: 'Failed to delete friendship' }
