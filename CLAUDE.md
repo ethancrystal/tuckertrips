@@ -480,20 +480,23 @@ Babel config for Jest lives in `jest.babel.config.js` and is activated only in t
 ## Deployment
 
 **Live URL:** https://www.tuckertrips.com
-**Vercel project ID:** `prj_mUMJ2CxmQtWA5KgUupUk2oRC26xT`
-**Vercel org (team) ID:** `team_NYPyvEJdro8BksLJ5yzHRBUt`
+**Vercel project ID:** `prj_DdM9cuEJwUQBZ6cArXte7lm4Xeu6`
+**Vercel org (team) ID:** `team_tpYaICaSl1suJW6Lfpa67Ye9` (`laviezahgmailcoms-projects`)
+**Vercel project name:** `tucker-trips`
+
+> **Gotcha:** the project's GitHub integration has previously drifted to a stale/deleted fork (e.g. `moizj00/tuckertrips`) instead of the canonical `ethancrystal/tuckertrips`, which silently breaks auto-deploy on push. If deploys stop triggering, verify with `vercel git connect https://github.com/ethancrystal/tuckertrips.git` (it reports whether it's already connected) before assuming the build itself is broken.
 
 ### Deploy Commands (must use prebuilt approach)
 
 ```bash
 # Step 1 — Build production output
-VERCEL_ORG_ID=team_NYPyvEJdro8BksLJ5yzHRBUt \
-VERCEL_PROJECT_ID=prj_mUMJ2CxmQtWA5KgUupUk2oRC26xT \
+VERCEL_ORG_ID=team_tpYaICaSl1suJW6Lfpa67Ye9 \
+VERCEL_PROJECT_ID=prj_DdM9cuEJwUQBZ6cArXte7lm4Xeu6 \
 vercel build --prod --token "$VERCEL_TOKEN" --yes
 
 # Step 2 — Deploy the prebuilt output
-VERCEL_ORG_ID=team_NYPyvEJdro8BksLJ5yzHRBUt \
-VERCEL_PROJECT_ID=prj_mUMJ2CxmQtWA5KgUupUk2oRC26xT \
+VERCEL_ORG_ID=team_tpYaICaSl1suJW6Lfpa67Ye9 \
+VERCEL_PROJECT_ID=prj_DdM9cuEJwUQBZ6cArXte7lm4Xeu6 \
 vercel deploy --prebuilt --prod --token "$VERCEL_TOKEN" --yes
 ```
 
