@@ -5,10 +5,66 @@
 -- (app/api/messages/route.js).
 --
 -- Also sets `search_path` on all SECURITY DEFINER / trigger functions in
--- this file to close the "Function Search Path Mutable" security lint, and
+-- this file to close the "Function Search Path Mutable" security lint,
 -- revokes EXECUTE from PUBLIC/anon on the SECURITY DEFINER messaging
--- functions (all of them require an authenticated caller's own user_uuid,
--- so anonymous access was never intentional).
+-- functions (all of them require an authenticated caller's own user id, so
+-- anonymous access was never intentional), and adds an auth.uid() ==
+-- caller-identity check inside every SECURITY DEFINER messaging function.
+-- Without that check, any authenticated user could pass an arbitrary
+-- user_uuid/p_user_id and read or mark-as-read another user's messages,
+-- since these functions run with elevated privilege and bypass RLS.
+
+CREATE OR REPLACE FUNCTION public.get_conversations(p_user_id uuid)
+ RETURNS TABLE(other_user_id uuid, other_user_name text, other_user_avatar text, last_message text, last_message_at timestamp with time zone, unread_count bigint)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'Not authorized to view this user''s conversations' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  WITH conversation_partners AS (
+    SELECT DISTINCT
+      CASE WHEN sender_id = p_user_id THEN recipient_id ELSE sender_id END AS partner_id
+    FROM public.messages
+    WHERE sender_id = p_user_id OR recipient_id = p_user_id
+  ),
+  latest_messages AS (
+    SELECT DISTINCT ON (cp.partner_id)
+      cp.partner_id,
+      m.content AS last_msg,
+      m.created_at AS last_msg_at
+    FROM conversation_partners cp
+    JOIN public.messages m ON (
+      (m.sender_id = p_user_id AND m.recipient_id = cp.partner_id) OR
+      (m.sender_id = cp.partner_id AND m.recipient_id = p_user_id)
+    )
+    ORDER BY cp.partner_id, m.created_at DESC
+  ),
+  unread_counts AS (
+    SELECT
+      sender_id AS partner_id,
+      COUNT(*) AS unread
+    FROM public.messages
+    WHERE recipient_id = p_user_id AND is_read = false
+    GROUP BY sender_id
+  )
+  SELECT
+    lm.partner_id AS other_user_id,
+    p.full_name AS other_user_name,
+    p.avatar_url AS other_user_avatar,
+    lm.last_msg AS last_message,
+    lm.last_msg_at AS last_message_at,
+    COALESCE(uc.unread, 0) AS unread_count
+  FROM latest_messages lm
+  JOIN public.profiles p ON p.id = lm.partner_id
+  LEFT JOIN unread_counts uc ON uc.partner_id = lm.partner_id
+  ORDER BY lm.last_msg_at DESC;
+END;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.get_unread_message_count(user_uuid uuid)
  RETURNS bigint
@@ -17,6 +73,10 @@ CREATE OR REPLACE FUNCTION public.get_unread_message_count(user_uuid uuid)
  SET search_path TO 'public'
 AS $function$
 BEGIN
+  IF auth.uid() IS DISTINCT FROM user_uuid THEN
+    RAISE EXCEPTION 'Not authorized to view this user''s unread count' USING ERRCODE = '42501';
+  END IF;
+
   RETURN (
     SELECT COUNT(*)
     FROM public.messages
@@ -32,6 +92,10 @@ CREATE OR REPLACE FUNCTION public.get_user_conversations(user_uuid uuid)
  SET search_path TO 'public'
 AS $function$
 BEGIN
+  IF auth.uid() IS DISTINCT FROM user_uuid THEN
+    RAISE EXCEPTION 'Not authorized to view this user''s conversations' USING ERRCODE = '42501';
+  END IF;
+
   RETURN QUERY
   WITH latest_messages AS (
     SELECT DISTINCT ON (
@@ -81,12 +145,35 @@ AS $function$
 DECLARE
   updated_count BIGINT;
 BEGIN
+  IF auth.uid() IS DISTINCT FROM user_uuid THEN
+    RAISE EXCEPTION 'Not authorized to mark this user''s messages as read' USING ERRCODE = '42501';
+  END IF;
+
   UPDATE public.messages
   SET is_read = true
   WHERE recipient_id = user_uuid AND sender_id = other_user_uuid AND is_read = false;
 
   GET DIAGNOSTICS updated_count = ROW_COUNT;
   RETURN updated_count;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.mark_messages_read(p_sender_id uuid, p_recipient_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_recipient_id THEN
+    RAISE EXCEPTION 'Not authorized to mark this user''s messages as read' USING ERRCODE = '42501';
+  END IF;
+
+  UPDATE public.messages
+  SET is_read = true, updated_at = NOW()
+  WHERE sender_id = p_sender_id
+    AND recipient_id = p_recipient_id
+    AND is_read = false;
 END;
 $function$;
 
