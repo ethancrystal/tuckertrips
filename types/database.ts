@@ -216,7 +216,7 @@ export type SharePermissions = TripShare['permissions']
 // Insert types (without generated fields)
 export type TripInsert = Omit<Trip, 'id' | 'created_at' | 'updated_at'>
 export type ProfileInsert = Omit<Profile, 'id' | 'created_at' | 'updated_at'>
-export type MessageInsert = Omit<Message, 'id' | 'created_at' | 'read'>
+export type MessageInsert = Omit<Message, 'id' | 'created_at' | 'is_read'>
 export type FriendshipInsert = Omit<Friendship, 'id' | 'created_at' | 'updated_at'>
 
 // Update types (all fields optional)
