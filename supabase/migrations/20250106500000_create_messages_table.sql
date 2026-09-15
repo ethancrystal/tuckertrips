@@ -40,6 +40,14 @@ BEGIN
   END IF;
 END $$;
 
+-- The DEFAULT only applies when an insert omits is_read; a legacy table
+-- (or a row that explicitly inserted NULL) can still have NULL rows, which
+-- `is_read = false` filters (get_unread_message_count, the conversations
+-- RPCs, and the read-marking UPDATE in app/api/messages/route.js) would
+-- silently exclude. Backfill then enforce NOT NULL so that can't recur.
+UPDATE public.messages SET is_read = FALSE WHERE is_read IS NULL;
+ALTER TABLE public.messages ALTER COLUMN is_read SET NOT NULL;
+
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 -- Idempotent so this migration can be re-run against an environment where
