@@ -132,3 +132,6 @@ agenthub/agents/youtube/db
 *.env.*
 
 .vercel
+
+.vercel
+.env*
