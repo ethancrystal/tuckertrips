@@ -67,6 +67,7 @@ CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK
 -- (mark_messages_read / mark_conversation_read), which already check
 -- auth.uid().
 DROP POLICY IF EXISTS "Users can update own messages" ON public.messages;
+DROP POLICY IF EXISTS "Recipients can mark messages as read" ON public.messages;
 CREATE POLICY "Recipients can mark messages as read" ON public.messages
   FOR UPDATE
   USING (auth.uid() = recipient_id)
