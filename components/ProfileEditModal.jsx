@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { X, Upload, User, Camera, Loader2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase.js'
+import { supabase, getAccessToken } from '@/lib/supabase.js'
 
 const ProfileEditModal = ({ open, onClose, user, onUpdate }) => {
   const [formData, setFormData] = useState({
@@ -72,8 +72,8 @@ const ProfileEditModal = ({ open, onClose, user, onUpdate }) => {
 
     try {
       // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      const accessToken = await getAccessToken()
+      if (!accessToken) {
         throw new Error('You must be logged in to upload photos')
       }
 
@@ -84,7 +84,7 @@ const ProfileEditModal = ({ open, onClose, user, onUpdate }) => {
       const response = await fetch('/api/storage/upload', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: formData,
       })
