@@ -38,9 +38,7 @@ const MyTripCard = ({ trip, onClick, onEdit, onDelete, onShare, onUnshare }) => 
   const tripTitle = trip.trip_name || trip.title || 'Untitled Trip'
   const tripImages = trip.trip_images || trip.photo_urls || []
   const coverPhoto = trip.cover_image || trip.cover_photo_url || trip.cover_photo || tripImages[0] || null
-  const isShared = Array.isArray(trip.shared_with)
-    ? trip.shared_with.length > 0
-    : Boolean(trip.is_shared)
+  const isShared = Boolean(trip.is_shared) || (Array.isArray(trip.shared_with) && trip.shared_with.length > 0)
 
   // Calculate average rating
   const averageRating = trip.trip_categories?.length > 0

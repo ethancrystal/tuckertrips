@@ -60,9 +60,7 @@ const TripCard = ({ trip, onDelete, onEdit, showActions = false, onMessage, onCl
   const tripStatus = trip.trip_type || trip.status || 'future'
   const tripImages = trip.trip_images || trip.photo_urls || []
   const coverPhotoValue = trip.cover_image || trip.cover_photo_url || trip.cover_photo || tripImages[0] || null
-  const isShared = Array.isArray(trip.shared_with)
-    ? trip.shared_with.length > 0
-    : Boolean(trip.is_shared)
+  const isShared = Boolean(trip.is_shared) || (Array.isArray(trip.shared_with) && trip.shared_with.length > 0)
 
   const handleShare = async () => {
     setSharing(true)
