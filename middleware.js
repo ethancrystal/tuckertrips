@@ -78,6 +78,22 @@ async function verifyAdminToken(token) {
 export async function middleware(request) {
   const { pathname } = request.nextUrl
 
+  // ── 0. Maintenance Mode ───────────────────────────────────────────────────
+  // Set MAINTENANCE_MODE=true (and redeploy) to serve the maintenance page
+  // everywhere with a 503. Unset it or set it to anything else to go live again.
+  if (process.env.MAINTENANCE_MODE === 'true' && !pathname.startsWith('/maintenance')) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Maintenance Required' },
+        { status: 503, headers: { 'Retry-After': '3600' } }
+      )
+    }
+    return NextResponse.rewrite(new URL('/maintenance', request.url), {
+      status: 503,
+      headers: { 'Retry-After': '3600' },
+    })
+  }
+
   // ── 1. Admin Route Protection ─────────────────────────────────────────────
   // Protect all /admin/* paths except the login page itself.
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin-login')) {
@@ -145,10 +161,7 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: [
-    '/admin/:path*',
-    '/dashboard/:path*',
-    '/settings/:path*',
-    '/profile/:path*',
-  ],
+  // Runs on every page and API route (needed for maintenance mode); static
+  // assets and files with an extension are skipped.
+  matcher: ['/((?!_next/static|_next/image|favicon|.*\\..*).*)'],
 }
