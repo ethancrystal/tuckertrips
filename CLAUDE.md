@@ -188,12 +188,11 @@ Migration status: Schema aligned and deployed. The canonical schema sources are 
 |---|---|---|
 | `id` | UUID PK | |
 | `user_id` | UUID FK -> profiles | |
-| `trip_name` | text NOT NULL | **primary field** |
-| `title` | text GENERATED | always equals `trip_name` (alias) |
+| `trip_name` | text NOT NULL | **primary field** — there is no separate `title` column |
 | `destination` | text | |
 | `start_date` / `end_date` | date | nullable |
 | `description` | text | nullable |
-| `trip_type` / `status` | enum | `'taken'|'future'|'ongoing'` |
+| `trip_type` | enum | `'taken'|'future'|'ongoing'` — there is no separate `status` column |
 | `visibility` | enum | `'private'|'friends'|'public'` |
 | `cover_image` / `cover_photo` / `cover_photo_url` | text | multiple alias columns |
 | `trip_images` | text[] | legacy photo field |
@@ -209,7 +208,7 @@ Migration status: Schema aligned and deployed. The canonical schema sources are 
 | `shared_at` | timestamptz | nullable |
 | `created_at` / `updated_at` | timestamptz | |
 
-> **Note:** The Zod validators in API routes accept `trip_name` only (not `title`). The `title` column in the database is a generated alias that always equals `trip_name`.
+> **Note:** `trip_name` is the only name field on `trips` — there is no `title` column in the live schema (it is not a generated alias, it simply does not exist). The Zod validators in API routes accept `trip_name` only.
 
 ### trip_categories — per-category ratings
 
@@ -232,7 +231,7 @@ Migration status: Schema aligned and deployed. The canonical schema sources are 
 | `shared_by` | UUID FK -> profiles | |
 | `shared_with` | UUID FK -> profiles | |
 | `share_type` | enum | `'email'|'link'` |
-| `permissions` | enum | `'view'|'edit'|'comment'` DEFAULT `'view'` |
+| `permission` | text (CHECK) | `'view'|'edit'` DEFAULT `'view'` — column is singular, not `permissions` |
 | `created_at` | timestamptz | |
 
 ### pending_shares — invitations to non-members
@@ -333,6 +332,11 @@ RLS: public INSERT allowed, authenticated SELECT.
 | PATCH | `/api/trips/[id]` | Update trip |
 | DELETE | `/api/trips/[id]` | Delete trip |
 
+### Shared Trips
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/shared-trips/[id]` | Get a trip via the public share view — enforces visibility/`trip_shares` access server-side via `checkTripAccess` (`lib/trip-access-utils.js`); used by `/shared/[tripId]` |
+
 ### Messages
 | Method | Path | Description |
 |---|---|---|
@@ -420,12 +424,16 @@ RLS: public INSERT allowed, authenticated SELECT.
 
 ### Sharing Flow
 
-1. Owner clicks Share on a trip
+**This flow is entirely client-side**, not server-mediated: `ShareTripModal.jsx` and `DashboardNew.jsx` write directly to Supabase from the browser (anon-key client, governed by RLS). No API route performs any of these writes — `GET /api/shared-trips/[id]` only *reads* an already-shared trip.
+
+1. Owner clicks Share on a trip; `ShareTripModal.jsx` marks it `is_shared = true` via a direct client-side `trips` update
 2. Enters recipient email
-3. System checks `profiles` table for matching email
-4. **Exists ->** inserts `trip_shares` record
-5. **Does not exist ->** inserts `pending_shares` record + sends invitation email via Resend
-6. Recipient signs up -> auto-redirected to Shared Trips, `pending_shares.claimed` set to `true`
+3. Client checks the `profiles` table for a matching email
+4. **Exists ->** client inserts a `trip_shares` record directly (`permission` is left unset on insert and falls back to its DB default)
+5. **Does not exist ->** client invokes the `send-trip-invitation` Supabase Edge Function to email an invite; if that call throws, it falls back to inserting a `pending_shares` record directly and copies the invite link to the clipboard instead
+6. Recipient signs up -> auto-redirected to Shared Trips, `pending_shares.claimed` set to `true` (also a direct client-side update, in `DashboardNew.jsx`)
+
+> **Note:** `send-trip-invitation` (`supabase/functions/send-trip-invitation/`) is not Resend — Resend (`lib/email.js`) is used elsewhere in the app (e.g. password reset) but not in this flow. The edge function currently builds and logs the HTML email but has no email provider wired up, so it doesn't actually deliver mail yet.
 
 ---
 
@@ -445,7 +453,7 @@ RLS: public INSERT allowed, authenticated SELECT.
 
 7. **Dual service key names.** The Supabase service role key is stored under two names: `SUPABASE_SERVICE_ROLE_KEY` (used in app API routes) and `SUPABASE_SERVICE_KEY` (used in some scripts and type files). Both must be set to the same value.
 
-8. **`trip_name` is the canonical column.** The database column is `trip_name`; `title` is a generated alias. API route validators (Zod schemas) accept `trip_name` only. TypeScript types include both fields for read compatibility.
+8. **`trip_name` is the canonical column — `title` does not exist in the live schema.** `title` was previously (incorrectly) documented here as a generated alias for `trip_name`; the live `trips` table has no such column at all. API route validators (Zod schemas) accept `trip_name` only. Some TypeScript types and older scripts still reference `title` — treat those as stale, not as evidence the column exists.
 
 9. **Missing Supabase config error.** If `NEXT_PUBLIC_SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_ANON_KEY` is absent or empty, `assertBrowserSupabaseConfig()` in `lib/supabase-config.js` throws a `SupabaseBrowserConfigError`. The check uses **static** `process.env.NEXT_PUBLIC_*` access (not dynamic `env[key]`), because webpack's DefinePlugin only replaces static patterns in browser bundles.
 
