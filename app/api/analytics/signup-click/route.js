@@ -1,10 +1,19 @@
 // Sign-Up Button Click Tracking API
 // Public endpoint to track Sign-Up button clicks for conversion analytics
-// No authentication required - this is public tracking
+// No authentication required - this is public tracking.
+//
+// Writes go through the service role key, not the anon key. The signup_clicks
+// RLS policies allow an anonymous INSERT but restrict SELECT to authenticated
+// users, and Postgres applies SELECT policies to INSERT ... RETURNING - which
+// is what the .select() below issues. Under the anon key that combination
+// fails with 'new row violates row-level security policy'. This route is
+// server-only and rate limited by session and IP, so the service role client
+// is the appropriate caller here (same pattern as /api/storage/upload).
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const RATE_LIMIT_WINDOW = 60000 // 1 minute
@@ -88,10 +97,22 @@ export async function POST(request) {
       )
     }
     
-    // Create Supabase client (using anon key for public insert)
+    // Create Supabase client (service role - server-only, bypasses RLS)
+    const serviceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+
+    if (!serviceKey) {
+      console.warn('[Analytics] Missing SUPABASE_SERVICE_ROLE_KEY - signup click not tracked')
+      return NextResponse.json(
+        { success: false, message: 'Click not tracked (analytics unavailable)' },
+        { status: 200 }
+      )
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      serviceKey,
+      { auth: { autoRefreshToken: false, persistSession: false } }
     )
     
     // Insert click record
@@ -108,9 +129,9 @@ export async function POST(request) {
       .single()
     
     if (error) {
-      console.warn('[Analytics] Failed to track signup click (table may not exist):', error.message)
+      console.warn('[Analytics] Failed to track signup click:', error.message)
       return NextResponse.json(
-        { success: false, message: 'Click not tracked (analytics table unavailable)' },
+        { success: false, message: 'Click not tracked (analytics unavailable)' },
         { status: 200 }
       )
     }

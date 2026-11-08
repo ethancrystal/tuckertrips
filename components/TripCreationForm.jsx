@@ -24,7 +24,7 @@ import {
   Users,
   Lock
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase.js'
+import { supabase, getAccessToken } from '@/lib/supabase.js'
 import { toast } from 'sonner'
 
 const STEPS = [
@@ -287,8 +287,8 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
     setUploading(true)
     try {
       // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      const accessToken = await getAccessToken()
+      if (!accessToken) {
         throw new Error('You must be logged in to upload photos')
       }
 
@@ -300,7 +300,7 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
       const response = await fetch('/api/storage/upload', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: formData,
       })
@@ -349,8 +349,8 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
     setUploading(true)
     try {
       // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      const accessToken = await getAccessToken()
+      if (!accessToken) {
         throw new Error('You must be logged in to upload photos')
       }
 
@@ -365,7 +365,7 @@ const TripCreationForm = ({ open, onClose, onTripCreated, onTripUpdated, copiedT
         const response = await fetch('/api/storage/upload', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`
+            'Authorization': `Bearer ${accessToken}`
           },
           body: formData,
         })

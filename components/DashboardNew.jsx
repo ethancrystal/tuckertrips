@@ -54,7 +54,10 @@ const Dashboard = ({ user: initialUser, onLogout }) => {
   const [loading, setLoading] = useState(false)
   const [tripsLoading, setTripsLoading] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Mobile drawer starts closed; the desktop sidebar starts expanded so the
+  // navigation labels are readable without hovering.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [copiedTrip, setCopiedTrip] = useState(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingTrip, setEditingTrip] = useState(null)
@@ -77,6 +80,18 @@ const Dashboard = ({ user: initialUser, onLogout }) => {
     const newMode = !darkMode
     setDarkMode(newMode)
     localStorage.setItem('dashboard_theme', newMode ? 'dark' : 'light')
+  }
+
+  // Load sidebar preference. Read after mount so the server-rendered markup
+  // and the first client render agree.
+  useEffect(() => {
+    setSidebarCollapsed(localStorage.getItem('dashboard_sidebar') === 'collapsed')
+  }, [])
+
+  // Save sidebar preference
+  const handleToggleSidebarCollapsed = (nextCollapsed) => {
+    setSidebarCollapsed(nextCollapsed)
+    localStorage.setItem('dashboard_sidebar', nextCollapsed ? 'collapsed' : 'expanded')
   }
 
   // Theme classes
@@ -981,12 +996,14 @@ const Dashboard = ({ user: initialUser, onLogout }) => {
         onToggleTheme={toggleTheme}
         isOpen={sidebarOpen}
         onToggle={setSidebarOpen}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={handleToggleSidebarCollapsed}
         onEditProfile={handleEditProfile}
         unreadMessageCount={unreadMessageCount}
       />
 
-      {/* Main Content - margin matches collapsed sidebar width (w-20) */}
-      <div className="flex-1 md:ml-20 transition-all duration-300">
+      {/* Main Content - margin tracks the sidebar width so the two never overlap */}
+      <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         {/* Content Area */}
         <div className="p-4 md:p-8 pt-16 md:pt-8">
           {renderContent()}
